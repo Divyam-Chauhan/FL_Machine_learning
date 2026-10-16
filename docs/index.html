@@ -56,27 +56,27 @@
   <header class="hero">
     <p class="eyebrow">Capstone · Applied Search Intelligence</p>
     <h1>Prioritizing content refresh reviews with search and engagement signals</h1>
-    <p class="dek">Can a learned ranking help editors find declining content sooner than a transparent rule? A client-held-out comparison on an anonymized starter dataset.</p>
+    <p class="dek">A comparison of a trained model and a hand-written scoring rule, tested on records from clients excluded from training, for ranking already-observed search-impression declines.</p>
   </header>
 
   <main>
     <section aria-labelledby="abstract">
       <h2 id="abstract">Abstract</h2>
-      <p>This project evaluates whether a Random Forest can rank pages with a historical search-traffic decline label ahead of a hand-built heuristic. On one held-out group of seven clients, model Precision@50 was 0.580, compared with 0.340 for the heuristic; the holdout decline prevalence was 0.511. The result is directional and modest overall (ROC-AUC 0.609). It supports further human-reviewed testing, not an automatic refresh decision or a claim that refreshing causes recovery.</p>
+      <p>We trained a machine-learning model called Random Forest, which combines many decision trees, to score records labelled as having a recent drop in search impressions. We compared its ranking with a hand-written scoring rule on records from seven clients left out of training. Among the 50 highest-ranked records, 29 had the decline label (precision 0.580), compared with 17 of 50 for the rule (0.340). The model's overall ranking ability was modest (ROC-AUC 0.609). Because the input metrics overlap the period used to define the decline label, this is a retrospective comparison—not an early-warning or future-prediction test. It does not show that refreshing content recovers traffic.</p>
       <p class="muted">Dataset: 30,000 anonymized content records · 32 pseudonymized client groups · evaluation seed: 42</p>
     </section>
 
     <section aria-labelledby="question">
       <h2 id="question">Question and decision</h2>
-      <p><strong>Research question:</strong> Can machine-learned ranking over observable search and engagement signals outperform fixed heuristic rules when prioritizing potentially declining content for editorial review?</p>
-      <p><strong>Decision supported:</strong> Which pages should an editor inspect first when review time is limited? A reviewer can check content freshness, search snippet/CTR, engagement, and editorial context before deciding what—if anything—to change.</p>
-      <p>The cost of a false positive is wasted editorial attention. A false negative can leave a potentially useful page's decline unreviewed. Human review remains part of the process.</p>
+      <p><strong>Research question:</strong> In this dataset, does a model trained on search, engagement, and content information rank records labelled with a recent search-impression decline differently from a transparent scoring rule, when tested on clients absent from model training?</p>
+      <p><strong>Decision this could inform:</strong> Which pages might an editor choose to inspect first? The score is only a way to order records for review. An editor still needs to check the page, its search snippet and engagement context, and decide whether any change is appropriate.</p>
+      <p>A false positive uses editorial time on a page that may not need attention; a false negative may leave a declining page unreviewed. The experiment measures agreement with an existing label, not the benefit of acting on the score.</p>
     </section>
 
     <section aria-labelledby="data">
       <h2 id="data">Data and safeguards</h2>
-      <p>The bundled anonymized snapshot contains 30,000 content records across 32 pseudonymized client groups. The analysis uses records with positive 90-day impressions and content age of at least 90 days. The label is whether <code>trend_direction</code> equals <code>down</code>; this is a historical label, not a future forecast.</p>
-      <p>Label-derived <code>trend_direction</code> and <code>trend_pct</code> are excluded from model inputs. Client IDs are used only to keep groups separate during validation; content IDs are not features. The page publishes aggregate metrics and charts only—no row-level queue, pseudonymous IDs, URLs, titles, client names, or raw queries.</p>
+      <p>The bundled anonymized snapshot contains 30,000 content records across 32 pseudonymized client groups. We kept records with at least one search impression in the trailing 90 days and content at least 90 days old. A record gets the decline label when its search impressions in the most recent 30 days are more than 20% lower than in the preceding 30 days. That label describes a change that has already happened; it is not a forecast.</p>
+      <p>We excluded the label fields (<code>trend_direction</code> and <code>trend_pct</code>) from the model inputs. Client IDs were used only to keep each client entirely in either training or testing; content IDs were not model inputs. Important limitation: the input features include 90-day impression totals, which overlap the 30-day periods used to create the label. The test therefore checks retrospective ranking on unseen clients, not whether the model can warn about a decline before it occurs. This page shows aggregate results only—not record-level recommendations or pseudonymous IDs.</p>
       <div aria-label="Excluded information">
         <span class="pill">No label-derived features</span>
         <span class="pill">Client-group holdout</span>
@@ -86,56 +86,56 @@
 
     <section aria-labelledby="method">
       <h2 id="method">Method</h2>
-      <p>The heuristic combines normalized log impressions, content freshness, and a rank-opportunity score. Its position score is 1.0 for average positions 4–20, 0.5 for positions 1–3, and 0.1 for other or unavailable positions. The notebook originally checked the broad position band first, making its nested top-three case unreachable; that condition order was corrected before these results were regenerated.</p>
-      <p>The Random Forest uses 100 trees, maximum depth 10, and random seed 42. Its 18 numeric inputs include search volume, impressions/clicks/sessions, content age/freshness, CTR, average position, and engagement measures. Five categorical inputs—competition level, content type, intent, age tier, and position tier—are one-hot encoded, yielding 52 model columns.</p>
-      <p>A single <code>GroupShuffleSplit</code> with 20% test size and seed 42 held out 7 client groups. Training used 23,837 rows from 25 clients; testing used 6,163 rows from unseen clients. This is one group holdout, not cross-validation or an out-of-fold estimate.</p>
+      <p>The comparison rule adds three hand-weighted scores: search visibility (log-scaled 90-day impressions), time since the page was last updated, and average search position. It gives more position points to pages ranking 4–20 than to pages already in the top three, and a small default score when position is unavailable or outside that range. These weights are a simple comparison rule, not weights learned from data.</p>
+      <p>The trained Random Forest combines 100 decision trees; each tree makes a series of yes/no splits, and the combined trees produce a score for the decline label. We used 18 numeric inputs (including search demand, impressions, clicks, sessions, content age, click-through rate (CTR), and engagement) and five descriptive categories (competition level, content type, intent, age group, and position group). The categories were converted into 52 numeric input columns. The model did not receive the decline-label fields.</p>
+      <p>For a fair client-level separation, we used one random split: 25 clients (23,837 records) for training and seven different clients (6,163 records) for testing. No test client contributed training records. This is one held-out test set, not repeated cross-validation. Seed 42 makes the split reproducible.</p>
     </section>
 
     <section aria-labelledby="results">
       <h2 id="results">Results on the same holdout</h2>
-      <p>The test-set decline prevalence was <strong>0.511</strong>. Precision@K is the share of declining-label records among the top K ranked records.</p>
+      <p>Among the 6,163 test records, <strong>51.1%</strong> had the historical decline label. The two “share” columns show what fraction of the top 20 or top 50 records in each ranking carried that label. The overall ranking score summarizes how often a decline-labelled record is ranked above a non-decline record across ranking cutoffs; 0.5 is chance-level ordering.</p>
       <div style="overflow-x:auto">
         <table class="metrics">
-          <thead><tr><th scope="col">Ranker</th><th scope="col">Precision@20</th><th scope="col">Precision@50</th><th scope="col">ROC-AUC</th></tr></thead>
+          <thead><tr><th scope="col">Scoring approach</th><th scope="col">Share with decline label (top 20)</th><th scope="col">Share with decline label (top 50)</th><th scope="col">Overall ranking score (ROC-AUC)</th></tr></thead>
           <tbody>
-            <tr><th scope="row">Heuristic</th><td>0.200</td><td>0.340</td><td>0.529</td></tr>
-            <tr><th scope="row">Random Forest</th><td>0.450</td><td>0.580</td><td>0.609</td></tr>
+            <tr><th scope="row">Hand-written rule</th><td>20.0%</td><td>34.0%</td><td>0.529</td></tr>
+            <tr><th scope="row">Trained model</th><td>45.0%</td><td>58.0%</td><td>0.609</td></tr>
           </tbody>
         </table>
       </div>
-      <p>The model gains 0.240 absolute Precision@50 over the heuristic (about 1.7×). Its Precision@50 is 0.069 above the holdout prevalence, while Precision@20 is below prevalence. ROC-AUC remains modest, so the observed top-50 improvement should not be read as strong general separation.</p>
+      <p>In this test set, 58% of the model's top 50 records had the decline label (29 records); the rule's top 50 contained 34% (17 records). That is a 24 percentage-point difference on this one split. The model's top-50 result was 6.9 points above the 51.1% test-set share, while its top 20 contained only 45% labelled declines—below that share. ROC-AUC is a summary of how often a randomly selected decline-labelled record is ranked above a non-decline record; 0.609 indicates only modest separation here. These figures describe this test sample and do not establish future performance.</p>
       <figure>
-        <img src="capstone_precision_comparison.png" alt="Bar chart comparing Precision at 50: heuristic 0.340 and Random Forest 0.580.">
-        <figcaption>Figure 1. Precision@50 on the same held-out clients; higher is better for this review-capacity metric.</figcaption>
+        <img src="capstone_precision_comparison.png" alt="Bar chart showing 17 of the heuristic's top 50 records and 29 of the trained model's top 50 records carried the historical decline label.">
+        <figcaption>Figure 1. Share of labelled declines among the top 50 records for each scoring approach, using the same held-out clients.</figcaption>
       </figure>
     </section>
 
     <section aria-labelledby="interpretation">
-      <h2 id="interpretation">What the model used</h2>
-      <p>The largest fitted-tree impurity importances were days with impressions (0.1582), log 90-day impressions (0.1160), average position (0.1109), and content age (0.0916). These are relative model split importances—not causal effects—and correlated signals can share or distort importance.</p>
+      <h2 id="interpretation">Which information mattered most to the fitted model?</h2>
+      <p>The model's largest input-importance scores were: number of days with impressions in the trailing 90 days (0.1582), log-scaled 90-day impressions (0.1160), average search position (0.1109), and page age (0.0916). These scores describe how useful each input was for the fitted trees' splits; they do not show that a factor caused a decline. Related inputs can overlap, and this importance measure can favor some kinds of features.</p>
       <figure>
-        <img src="capstone_feature_importance.png" alt="Horizontal bar chart of the top eight Random Forest feature importances, led by days with impressions, log impressions, average position, and content age.">
-        <figcaption>Figure 2. Top eight relative feature importances from this fitted Random Forest.</figcaption>
+        <img src="capstone_feature_importance.png" alt="Horizontal bar chart of the eight inputs most used by the trained model to separate records with and without the historical decline label.">
+        <figcaption>Figure 2. Relative input-importance scores for the fitted model. Higher scores indicate more use in the tree splits, not greater causal influence.</figcaption>
       </figure>
     </section>
 
     <section aria-labelledby="recommendation">
       <h2 id="recommendation">Practical use and limits</h2>
-      <p>Use this as a candidate queue for editors, not as an automated publishing system. Verify each page and its context before acting; record changes and monitor outcomes. In the exploratory full-portfolio queue, aggregate action suggestions were: refresh 10,877; CTR review 9,428; monitor 6,428; engagement review 3,204; expand and refresh 63. These are action-rule counts, not measured improvements.</p>
+      <p>The score could be used to order pages for editorial inspection, but it should not trigger automatic changes. Check each page and its context before deciding whether to update it; track results if changes are made. The exploratory queue assigned these rule-based review categories: refresh 10,877; review the search snippet/click-through rate 9,428; monitor 6,428; review engagement 3,204; expand and refresh 63. These are category counts across the dataset, not measured benefits or success rates.</p>
       <ul>
-        <li>The label describes historical decline; it does not predict a future time period.</li>
-        <li>Only one client-group split was evaluated. Results may vary across clients and splits.</li>
-        <li>ROC-AUC is modest, and missing values are filled with zero in this prototype.</li>
-        <li>SERP features, seasonality, and external changes may explain traffic shifts but are not modeled here.</li>
-        <li>The queue model was fitted on training clients and then scored over the full portfolio; rows from training clients are not out-of-sample predictions.</li>
-        <li>No causal effect of content refresh is estimated. Prospective controlled testing is needed to measure recovery.</li>
+        <li>The label identifies a drop already observed between two adjacent 30-day periods. The 90-day input metrics overlap those periods, so this analysis cannot establish advance warning.</li>
+        <li>Only one split of clients was tested. Results could differ for other clients or another split.</li>
+        <li>The overall ranking score was modest; missing numeric inputs were filled with zero, which can affect results.</li>
+        <li>Search-results features, seasonal patterns, and external changes are not included and could help explain the observed drops.</li>
+        <li>The exploratory full-dataset queue was scored by a model trained on 25 clients. Records from those training clients were seen during fitting, so their queue scores are not independent test predictions.</li>
+        <li>This study did not measure whether editing a page recovers its traffic. That would require a separate prospective experiment.</li>
       </ul>
-      <div class="callout"><strong>Claim boundary:</strong> This is an observational, directional decision-support analysis. It does not predict Google's algorithm or prove that a content refresh will recover traffic.</div>
+      <div class="callout"><strong>What this study can say:</strong> On one held-out set of clients, the trained model placed more records carrying an already-observed decline label in its top 50 than the hand-written rule did. It cannot say whether it would identify future declines early or whether changing a page would restore traffic.</div>
     </section>
 
     <section aria-labelledby="repro">
       <h2 id="repro">Reproducibility</h2>
-      <p>Verified with Python 3.11.9, NumPy 2.4.6, pandas 3.0.6, scikit-learn 1.9.1, and Matplotlib 3.10.8. The group split and Random Forest use seed 42.</p>
+      <p>Verified with Python 3.11.9, NumPy 2.4.6, pandas 3.0.6, scikit-learn 1.9.1, and Matplotlib 3.10.8. The group split and trained tree-ensemble model use seed 42.</p>
       <pre><code>python -m pip install -r requirements.txt jupyter
 jupyter notebook work/notebooks/capstone.ipynb</code></pre>
       <p>From the repository root, open the notebook and choose <strong>Run All</strong>. The notebook uses <code>data/raw/content_refresh_anonymized.csv</code> and writes aggregate figures into <code>work/outputs/</code>.</p>

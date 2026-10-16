@@ -6,15 +6,15 @@
 
 ## 1. Problem framing
 
-This project asks whether a learned ranking can help editors identify existing content that is more likely to show declining search traffic. The decision is which pages to review first when editorial time is limited. The output is a ranked, human-reviewed refresh queue; an editor decides whether to inspect a page, revise its content, review its search snippet, or leave it alone. A false positive wastes review time; a false negative may leave a useful page's decline unnoticed. The model does not prescribe automatic publishing.
+This project compares a trained model with a hand-written scoring rule to see how they rank records carrying a historical search-impression decline label. The model is a Random Forest: it combines many decision trees, each of which applies a sequence of yes/no splits to the input information. The score could help an editor decide which pages to inspect first, but does not decide whether to make a change. A high-ranked record without the decline label may use review time unnecessarily; a decline-labelled record ranked lower may not be reviewed.
 
 ## 2. Data safety
 
-The analysis uses the repository's 30,000-row anonymized starter snapshot, with 32 pseudonymized client groups. It filters to records with positive 90-day impressions and content age of at least 90 days. The binary label is `trend_direction == "down"`. `trend_direction` and `trend_pct` are not features. `client_id` is used only for the group split; `content_id` is not a feature. The model also excludes last-30-day fields. No URLs, titles, raw queries, client names, or row-level recommendations are included in the published paper.
+The analysis uses the repository's 30,000-row anonymized starter snapshot, with 32 pseudonymized client groups. It filters to records with positive 90-day impressions and content age of at least 90 days. The binary label is `trend_direction == "down"`: impressions in the latest 30-day period are more than 20% below the preceding 30-day period. This records an already-observed change, not a future outcome. `trend_direction` and `trend_pct` are not model inputs. `client_id` is used only for the group split; `content_id` is not a feature. However, the 90-day input metrics overlap the 30-day windows used to form the label. The evaluation therefore measures retrospective ranking alignment on held-out clients, not advance warning. No URLs, titles, raw queries, client names, or row-level recommendations are included in the published paper.
 
 ## 3. Baseline
 
-The transparent heuristic uses 90-day impressions, time since last update, and average search position:
+The transparent hand-written scoring rule uses three quantities: 90-day search impressions (as a visibility measure), days since last update (as a freshness measure), and average search position (as a visibility/opportunity measure):
 
 `100 × (0.40 × visibility + 0.30 × freshness + 0.25 × position opportunity)`
 
@@ -22,24 +22,24 @@ Visibility is `log1p(impressions_90d) / log1p(30000)`. Freshness is `days_since_
 
 ## 4. Model / analysis
 
-The target is a historical decline indicator, not a future outcome: `is_declining_label = (trend_direction == "down")`. The analysis compares the heuristic with a 100-tree Random Forest (`max_depth=10`, `random_state=42`). Inputs are 18 numeric signals (`search_volume`, `competition`, `cpc`, `word_count`, `char_count`, log-transformed 90-day impressions/clicks/sessions/AI sessions, days with impressions/sessions, content age, days since update, CTR, average position, engagement rate, scroll rate, and AI traffic percentage) and five categorical fields (`competition_level`, `content_type`, `main_intent`, `age_tier`, `position_tier`). One-hot encoding produces 52 model columns for this run.
+The target is an already-observed decline indicator, not a future outcome: `is_declining_label = (trend_direction == "down")`. The analysis compares the rule with a Random Forest that combines 100 decision trees (`max_depth=10`, `random_state=42`). Inputs are 18 numeric signals (`search_volume`, `competition`, `cpc`, `word_count`, `char_count`, log-transformed 90-day impressions/clicks/sessions/AI sessions, days with impressions/sessions, content age, days since update, CTR, average position, engagement rate, scroll rate, and AI traffic percentage) and five categorical fields (`competition_level`, `content_type`, `main_intent`, `age_tier`, `position_tier`). The five categories are converted into numeric indicator columns, producing 52 input columns for this run.
 
 ## 5. Evaluation
 
-`GroupShuffleSplit(test_size=0.20, random_state=42)` holds out complete client groups: 25 training clients (23,837 rows) and 7 unseen test clients (6,163 rows). The test-set decline prevalence is 0.511. The comparison below uses the same test rows and the same top-K definition for both rankers.
+`GroupShuffleSplit(test_size=0.20, random_state=42)` holds out complete client groups: 25 training clients (23,837 rows) and 7 unseen test clients (6,163 rows). In the test group, 51.1% of records carried the decline label. The comparison below uses the same test rows and top-20/top-50 cutoffs for both methods. The top-20 and top-50 shares are the fractions of those records carrying the label. ROC-AUC summarizes how often a decline-labelled record is ranked above a non-decline record across cutoffs; 0.5 is chance-level ordering.
 
-| Ranker | Precision@20 | Precision@50 | ROC-AUC |
+| Scoring approach | Share with label (top 20) | Share with label (top 50) | Overall ranking score (ROC-AUC) |
 |---|---:|---:|---:|
-| Heuristic baseline | 0.200 | 0.340 | 0.529 |
-| Random Forest | 0.450 | 0.580 | 0.609 |
+| Hand-written rule | 20.0% | 34.0% | 0.529 |
+| Trained model | 45.0% | 58.0% | 0.609 |
 
-At 50 reviewed pages, the model's precision is 0.240 higher than the heuristic and about 1.7 times its precision. Precision@50 is 0.069 above the test-set prevalence; precision@20 (0.450) is below prevalence. ROC-AUC is only 0.609, so overall separation remains modest. These top-K results are directional evidence from one client holdout, not a guarantee of performance on new samples.
+In this test set, 29 of the model's top 50 records had the decline label, compared with 17 of the rule's top 50. That is a 24-percentage-point difference in the share for this one test split. The model's top-50 share is 6.9 percentage points above the 51.1% test-set share; its top-20 share (45.0%) is below that level. The overall ranking score of 0.609 indicates only modest separation here. These are retrospective results from one client holdout, not evidence of advance warning or a guarantee of performance on new samples.
 
 These are capstone-notebook results, not a rerun of the reference pipeline benchmark in `outputs/model_report.md`. The reference pipeline uses a different client split, baseline, feature encoding, and Random Forest configuration (200 trees and `min_samples_leaf=25`, versus 100 trees and no class weighting here); its reported 0.680/0.240 Precision@50 values must not be mixed into this table.
 
 ## 6. Interpretation
 
-The largest Random Forest impurity importances were days with impressions (0.1582), log 90-day impressions (0.1160), average position (0.1109), and content age (0.0916), followed by word count (0.0643), character count (0.0521), CTR (0.0388), and scroll rate (0.0364). These describe how the fitted trees split this dataset; they are not causal effects, and correlated signals can share or distort importance.
+The largest tree-split importance scores were days with impressions (0.1582), log 90-day impressions (0.1160), average position (0.1109), and content age (0.0916), followed by word count (0.0643), character count (0.0521), CTR (0.0388), and scroll rate (0.0364). These scores describe how the fitted trees used the inputs to separate the labels; they are not causal effects, and related inputs can share or distort importance.
 
 The two figures embedded in the deployed page show the corrected same-holdout Precision@50 comparison and these top eight relative importances.
 
