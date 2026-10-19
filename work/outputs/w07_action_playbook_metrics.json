@@ -1,0 +1,91 @@
+{
+  "action_counts": {
+    "review_query_page_fit_and_internal_links": 8412,
+    "review_snippet_and_search_intent": 29932,
+    "verify_coverage_before_edit": 1201
+  },
+  "april_decline_proxy_base_rate": 0.552484511316222,
+  "candidate_count": 39545,
+  "candidate_rule": {
+    "average_position_max_inclusive": 20,
+    "average_position_min_exclusive": 0,
+    "ctr_percent_max_exclusive": 0.5,
+    "march_impressions_min": 500
+  },
+  "client_group_count": 31,
+  "cv_fold_summaries": [
+    {
+      "fold": 1,
+      "heldout_clients": 1,
+      "heldout_items": 11069,
+      "train_clients": 30,
+      "train_items": 28476
+    },
+    {
+      "fold": 2,
+      "heldout_clients": 1,
+      "heldout_items": 9435,
+      "train_clients": 30,
+      "train_items": 30110
+    },
+    {
+      "fold": 3,
+      "heldout_clients": 6,
+      "heldout_items": 6384,
+      "train_clients": 25,
+      "train_items": 33161
+    },
+    {
+      "fold": 4,
+      "heldout_clients": 7,
+      "heldout_items": 6347,
+      "train_clients": 24,
+      "train_items": 33198
+    },
+    {
+      "fold": 5,
+      "heldout_clients": 16,
+      "heldout_items": 6310,
+      "train_clients": 15,
+      "train_items": 33235
+    }
+  ],
+  "feature_names": [
+    "log_impressions_mar",
+    "log_clicks_mar",
+    "ctr_mar",
+    "avg_position_mar",
+    "gsc_days_mar"
+  ],
+  "grouped_oof_folds": 5,
+  "library_versions": {
+    "numpy": "2.4.6",
+    "pandas": "3.0.6",
+    "scikit_learn": "1.9.1"
+  },
+  "minimum_gsc_days_per_month": 20,
+  "model": {
+    "name": "L2-regularized Logistic Regression",
+    "seed": 42,
+    "validation": "5-fold GroupKFold by client; grouped out-of-fold scores"
+  },
+  "queue_exports_label_or_future_fields": false,
+  "rankings": {
+    "ML-07 rule: log impressions": {
+      "average_precision": 0.5120250531276977,
+      "precision_at_10": 0.4,
+      "precision_at_20": 0.35,
+      "precision_at_50": 0.4,
+      "roc_auc": 0.4499419008267387
+    },
+    "ML-08 Logistic Regression: grouped OOF": {
+      "average_precision": 0.6196279682972392,
+      "precision_at_10": 0.8,
+      "precision_at_20": 0.8,
+      "precision_at_50": 0.86,
+      "roc_auc": 0.5948471635110304
+    }
+  },
+  "scope": "ML-07-eligible items only; March 2026 features and April 2026 decline proxy; retrospective association, not causal treatment effect.",
+  "score_interpretation": "Grouped out-of-fold Logistic Regression ranking score; not calibrated probability or confidence."
+}
