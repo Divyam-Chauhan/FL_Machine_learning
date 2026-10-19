@@ -3,145 +3,208 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A capstone study of ranking content for editorial refresh review using anonymized search and engagement signals.">
-  <title>Prioritizing Content Refresh Reviews</title>
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="A retrospective, client-grouped evaluation of a logistic-regression ranking against a transparent rule for human review of eligible FlyRank search content.">
+  <title>Can a grouped model improve search-content review ranking? | ML-11</title>
   <style>
-    :root {
-      color-scheme: light;
-      --ink: #172b35;
-      --muted: #536871;
-      --line: #d9e3e6;
-      --paper: #ffffff;
-      --wash: #f1f6f5;
-      --accent: #126b64;
-      --accent-dark: #0b514c;
-      --soft: #e4f1ee;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    :root { --ink:#172a32; --muted:#52636b; --paper:#f7f8f5; --white:#fff; --line:#dbe2df; --teal:#087e79; --teal-dark:#075c59; --gold:#e8bd63; --wash:#e8f3f0; --max:1160px; }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; background:var(--paper); color:var(--ink); font:17px/1.65 "Segoe UI",system-ui,-apple-system,BlinkMacSystemFont,sans-serif; }
+    a { color:var(--teal-dark); text-decoration-thickness:1px; text-underline-offset:3px; }
+    a:hover { color:#034743; }
+    a:focus-visible { outline:3px solid var(--gold); outline-offset:3px; border-radius:3px; }
+    .skip { position:absolute; left:-10000px; top:1rem; z-index:10; background:#fff; padding:.7rem 1rem; }
+    .skip:focus { left:1rem; }
+    .masthead { background:#102a32; color:#f5f8f5; border-bottom:4px solid var(--gold); }
+    .mast-inner { width:min(var(--max),calc(100% - 2.5rem)); margin:auto; padding:1rem 0; display:flex; justify-content:space-between; gap:1rem; font-size:.78rem; letter-spacing:.11em; text-transform:uppercase; }
+    .masthead a { color:#d8efea; }
+    .hero { background:#163740; color:#f8fbf8; padding:clamp(3rem,8vw,7rem) 0 3.6rem; }
+    .hero-inner { width:min(var(--max),calc(100% - 2.5rem)); margin:auto; }
+    .eyebrow { color:#b9ded6; font-size:.8rem; letter-spacing:.14em; text-transform:uppercase; font-weight:700; }
+    h1 { max-width:980px; margin:.7rem 0 1rem; font:600 clamp(2.5rem,6.2vw,5.25rem)/1.03 Georgia,"Times New Roman",serif; letter-spacing:-.035em; }
+    .dek { max-width:780px; margin:0; color:#dbe8e5; font-size:clamp(1.08rem,2vw,1.35rem); }
+    .byline { margin:2rem 0 0; color:#bdd1ce; font-size:.93rem; }
+    .metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; margin-top:2.5rem; border:1px solid #547078; background:#547078; }
+    .metric { min-height:122px; padding:1rem 1.2rem; background:#1b4149; }
+    .metric strong { display:block; color:#fff; font:600 clamp(1.7rem,3vw,2.35rem)/1.2 Georgia,serif; }
+    .metric span { color:#c5d9d5; font-size:.82rem; }
+    .layout { width:min(var(--max),calc(100% - 2.5rem)); margin:2.5rem auto 5rem; display:grid; grid-template-columns:210px minmax(0,760px); gap:clamp(2rem,6vw,5.5rem); align-items:start; }
+    nav.toc { position:sticky; top:1.25rem; border-left:2px solid var(--line); padding:.2rem 0 .2rem 1rem; font-size:.88rem; }
+    nav.toc strong { display:block; margin-bottom:.5rem; font-size:.75rem; letter-spacing:.1em; text-transform:uppercase; }
+    nav.toc a { display:block; padding:.2rem 0; color:var(--muted); text-decoration:none; }
+    nav.toc a:hover { color:var(--teal-dark); text-decoration:underline; }
+    .layout > nav, .layout > main, main, article { min-width:0; }
+    section { scroll-margin-top:1.5rem; margin:0 0 3.5rem; }
+    h2 { margin:0 0 1rem; font:600 clamp(1.8rem,4vw,2.55rem)/1.12 Georgia,"Times New Roman",serif; letter-spacing:-.02em; }
+    h3 { margin:1.7rem 0 .5rem; font:650 1.2rem/1.3 system-ui,sans-serif; }
+    p { margin:.65rem 0 1rem; }
+    .abstract { border-left:4px solid var(--teal); background:#fff; padding:1.3rem 1.5rem; box-shadow:0 10px 25px #1731380b; }
+    .abstract p { margin:.2rem 0; }
+    .abstract-label { color:var(--teal-dark); font-size:.75rem; letter-spacing:.12em; font-weight:750; text-transform:uppercase; }
+    .callout { margin:1.5rem 0; padding:1rem 1.2rem; border:1px solid #c2ddd6; border-radius:8px; background:var(--wash); }
+    .callout strong { color:var(--teal-dark); }
+    .equation { padding:1rem; overflow-wrap:anywhere; background:#f0f3f1; border-radius:6px; font: .94rem/1.6 ui-monospace,SFMono-Regular,Consolas,monospace; }
+    figure { margin:1.5rem 0 2rem; padding:1rem; border:1px solid var(--line); border-radius:10px; background:var(--white); }
+    figure img { display:block; width:100%; height:auto; }
+    figcaption { margin:.9rem .2rem .15rem; color:var(--muted); font-size:.9rem; }
+    figcaption strong { color:var(--ink); }
+    .table-scroll { min-width:0; max-width:100%; overflow-x:auto; border:1px solid var(--line); border-radius:8px; background:#fff; }
+    table { width:100%; border-collapse:collapse; font-size:.88rem; }
+    caption { padding:.8rem 1rem; color:var(--muted); text-align:left; font-size:.85rem; }
+    th,td { padding:.65rem .75rem; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; }
+    th { background:#edf3f1; color:#243b42; font-size:.78rem; }
+    th:first-child,td:first-child { text-align:left; }
+    tbody tr:last-child td { border-bottom:0; }
+    .note { color:var(--muted); font-size:.91rem; }
+    .ranked { padding-left:1.4rem; }
+    .ranked li { margin:0 0 1.1rem; padding-left:.25rem; }
+    .refs { padding-left:1.2rem; font-size:.9rem; }
+    .refs li { margin:.7rem 0; overflow-wrap:anywhere; }
+    footer { background:#102a32; color:#c6d8d4; padding:2rem 0; font-size:.85rem; }
+    footer div { width:min(var(--max),calc(100% - 2.5rem)); margin:auto; }
+    footer a { color:#d8efea; }
+    @media (max-width:800px) {
+      .layout { grid-template-columns:minmax(0,1fr); gap:1rem; margin-top:1.5rem; }
+      nav.toc { min-width:0; width:100%; position:static; display:flex; flex-wrap:wrap; gap:.15rem .9rem; border-left:0; border-bottom:1px solid var(--line); padding:0 0 .8rem; }
+      nav.toc strong { width:100%; }
+      nav.toc a { display:inline-block; }
+      .metrics { grid-template-columns:repeat(2,1fr); }
+      .metric { min-height:100px; }
     }
-    * { box-sizing: border-box; }
-    body { margin: 0; color: var(--ink); background: var(--wash); line-height: 1.65; }
-    a { color: var(--accent-dark); }
-    .hero { padding: 4.5rem max(1.25rem, calc((100vw - 1040px) / 2)); color: white; background: #123b43; }
-    .eyebrow { margin: 0 0 .75rem; color: #a8dcd2; font-size: .78rem; font-weight: 750; letter-spacing: .13em; text-transform: uppercase; }
-    h1 { max-width: 980px; margin: 0; font-size: clamp(2.2rem, 5vw, 3.6rem); line-height: 1.08; letter-spacing: -.04em; }
-    .dek { max-width: 820px; margin: 1.2rem 0 0; color: #d6e6e6; font-size: 1.12rem; }
-    main { width: min(1040px, calc(100% - 2rem)); margin: 2rem auto 4rem; }
-    section, .callout { margin: 1rem 0; padding: clamp(1.2rem, 3vw, 2rem); border: 1px solid var(--line); border-radius: 14px; background: var(--paper); }
-    h2 { margin: 0 0 .8rem; font-size: 1.5rem; letter-spacing: -.02em; }
-    h3 { margin: 1.4rem 0 .4rem; font-size: 1.05rem; }
-    p { margin: .55rem 0; }
-    .muted, figcaption { color: var(--muted); }
-    .callout { border-color: #b8d9d3; background: var(--soft); }
-    .metrics { width: 100%; margin: 1rem 0 .5rem; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-    .metrics th, .metrics td { padding: .7rem .6rem; border-bottom: 1px solid var(--line); text-align: right; }
-    .metrics th:first-child, .metrics td:first-child { text-align: left; }
-    .metrics thead th { color: var(--muted); font-size: .85rem; }
-    figure { margin: 1.4rem 0; }
-    figure img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; }
-    figcaption { margin-top: .45rem; font-size: .9rem; }
-    ul { padding-left: 1.25rem; }
-    code { padding: .12rem .32rem; border-radius: 4px; background: #edf2f3; font-size: .92em; }
-    pre { overflow-x: auto; padding: 1rem; border-radius: 8px; background: #172b35; color: #f3f7f6; }
-    pre code { padding: 0; background: transparent; }
-    .pill { display: inline-block; margin: .15rem .25rem .15rem 0; padding: .28rem .65rem; border: 1px solid #c7dcda; border-radius: 99px; color: var(--accent-dark); background: #f4faf8; font-size: .88rem; }
-    footer { padding: 1.5rem 1rem 2.5rem; color: var(--muted); text-align: center; font-size: .9rem; }
-    @media (max-width: 560px) {
-      .hero { padding-top: 3rem; padding-bottom: 3rem; }
-      .metrics th, .metrics td { padding: .55rem .28rem; font-size: .88rem; }
-      section, .callout { border-radius: 10px; }
+    @media (max-width:520px) {
+      body { font-size:16px; }
+      .mast-inner,.hero-inner,.layout,footer div { width:calc(100% - 1.5rem); }
+      .mast-inner { font-size:.68rem; align-items:center; flex-wrap:wrap; }
+      .mast-inner span { min-width:0; max-width:100%; }
+      .mast-inner a { margin-left:auto; }
+      .hero { padding:3rem 0 2rem; }
+      .metrics { grid-template-columns:repeat(2,minmax(0,1fr)); margin-top:1.6rem; }
+      .metric { min-width:0; padding:.8rem; min-height:92px; }
+      .metric span { font-size:.76rem; overflow-wrap:anywhere; }
+      .hero h1 { font-size:clamp(2rem,9vw,2.6rem); }
+      .layout, article, section { min-width:0; }
+      figure { padding:.55rem; margin-left:-.15rem; margin-right:-.15rem; }
+      .abstract { padding:1rem; }
     }
+    @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } }
   </style>
 </head>
 <body>
-  <header class="hero">
-    <p class="eyebrow">Capstone · Applied Search Intelligence</p>
-    <h1>Prioritizing content refresh reviews with search and engagement signals</h1>
-    <p class="dek">A comparison of a trained model and a hand-written scoring rule, tested on records from clients excluded from training, for ranking already-observed search-impression declines.</p>
-  </header>
-
-  <main>
-    <section aria-labelledby="abstract">
-      <h2 id="abstract">Abstract</h2>
-      <p>We trained a machine-learning model called Random Forest, which combines many decision trees, to score records labelled as having a recent drop in search impressions. We compared its ranking with a hand-written scoring rule on records from seven clients left out of training. Among the 50 highest-ranked records, 29 had the decline label (precision 0.580), compared with 17 of 50 for the rule (0.340). The model's overall ranking ability was modest (ROC-AUC 0.609). Because the input metrics overlap the period used to define the decline label, this is a retrospective comparison—not an early-warning or future-prediction test. It does not show that refreshing content recovers traffic.</p>
-      <p class="muted">Dataset: 30,000 anonymized content records · 32 pseudonymized client groups · evaluation seed: 42</p>
+<a class="skip" href="#main">Skip to paper</a>
+<header class="masthead"><div class="mast-inner"><span>FlyRank · ML internship research</span><a href="https://flyrank.ai/">FlyRank.ai</a></div></header>
+<header class="hero">
+  <div class="hero-inner">
+    <div class="eyebrow">ML-11 · Lane 2 · Refresh / Content Opportunity Scoring</div>
+    <h1>Can a grouped model improve search-content review ranking?</h1>
+    <p class="dek">A retrospective evaluation of a machine-learning ranking and a transparent rule on an observed next-month impression-decline proxy.</p>
+    <p class="byline">Divyam Chauhan · FlyRank Machine Learning Internship · 2026</p>
+    <div class="metrics" aria-label="Study population summary">
+      <div class="metric"><strong>95,633</strong><span>paired page-client items</span></div>
+      <div class="metric"><strong>39,545</strong><span>ML-07 eligible candidates</span></div>
+      <div class="metric"><strong>31</strong><span>candidate client groups</span></div>
+      <div class="metric"><strong>55.2%</strong><span>candidate decline-proxy rate</span></div>
+    </div>
+  </div>
+</header>
+<div class="layout">
+  <nav class="toc" aria-label="Paper contents"><strong>On this page</strong><a href="#abstract">Abstract</a><a href="#problem">Problem</a><a href="#data">Data</a><a href="#methods">Methodology</a><a href="#results">Results</a><a href="#limits">Limitations</a><a href="#recommendations">Recommendations</a><a href="#repro">Reproducibility</a><a href="#credit">Data credit</a></nav>
+  <main id="main"><article>
+    <section id="abstract" aria-labelledby="abstract-title">
+      <div class="abstract"><div class="abstract-label" id="abstract-title">Abstract · five sentences</div>
+      <p>We ask whether a learned ranking can order eligible search-content items for human review differently from a simple visibility rule. We use 95,633 paired page-client items from warehouse build v20260703 and evaluate the 39,545 items passing the ML-07 gate against an April impression-decline proxy. We compare an L2 Logistic Regression using March-only features with an ML-07 rule based on March impressions in five client-grouped folds. Fold-macro Precision@50 was 0.804 for the model and 0.420 for the rule, a 0.384 absolute difference or about 1.9 times the rule, and the model was higher in all five folds. This is a strong result against this specified rule on one selected retrospective cohort; it does not establish future-cohort performance, causal refresh impact, or traffic recovery after an edit.</p></div>
     </section>
 
-    <section aria-labelledby="question">
-      <h2 id="question">Question and decision</h2>
-      <p><strong>Research question:</strong> In this dataset, does a model trained on search, engagement, and content information rank records labelled with a recent search-impression decline differently from a transparent scoring rule, when tested on clients absent from model training?</p>
-      <p><strong>Decision this could inform:</strong> Which pages might an editor choose to inspect first? The score is only a way to order records for review. An editor still needs to check the page, its search snippet and engagement context, and decide whether any change is appropriate.</p>
-      <p>A false positive uses editorial time on a page that may not need attention; a false negative may leave a declining page unreviewed. The experiment measures agreement with an existing label, not the benefit of acting on the score.</p>
+    <section id="problem"><h2>1. Introduction and decision</h2>
+      <p>An editor with limited review time needs a sensible first pass through a large set of pages with weak click-through rates. This study asks whether a compact model can rank a narrowly selected pool for review more usefully than a transparent rule that orders candidates by March impressions.</p>
+      <p>The decision supported is <em>which eligible page-client item to inspect first</em>. It is not whether a page is stale, whether it needs a refresh, or whether an edit will improve search traffic. The target records an observed April impression change; it is not an intervention outcome.</p>
     </section>
 
-    <section aria-labelledby="data">
-      <h2 id="data">Data and safeguards</h2>
-      <p>The bundled anonymized snapshot contains 30,000 content records across 32 pseudonymized client groups. We kept records with at least one search impression in the trailing 90 days and content at least 90 days old. A record gets the decline label when its search impressions in the most recent 30 days are more than 20% lower than in the preceding 30 days. That label describes a change that has already happened; it is not a forecast.</p>
-      <p>We excluded the label fields (<code>trend_direction</code> and <code>trend_pct</code>) from the model inputs. Client IDs were used only to keep each client entirely in either training or testing; content IDs were not model inputs. Important limitation: the input features include 90-day impression totals, which overlap the 30-day periods used to create the label. The test therefore checks retrospective ranking on unseen clients, not whether the model can warn about a decline before it occurs. This page shows aggregate results only—not record-level recommendations or pseudonymous IDs.</p>
-      <div aria-label="Excluded information">
-        <span class="pill">No label-derived features</span>
-        <span class="pill">Client-group holdout</span>
-        <span class="pill">Aggregate results only</span>
-      </div>
+    <section id="data"><h2>2. Data</h2>
+      <p>The source is release/build <strong>v20260703</strong> of the gated Hugging Face <a href="https://huggingface.co/datasets/FlyRank/internship-warehouse"><code>FlyRank/internship-warehouse</code></a>, table <code>fact_content_daily_performance</code>. Daily rows were aggregated to one page-client pair for March and April 2026. A pair was retained only when both months had at least 20 days with <code>gsc_data_available IS TRUE</code> and March impressions were positive. This produced 95,633 paired items; 47,323 (49.5%) met the April decline proxy before candidate selection.</p>
+      <p>The ML-07 candidate gate requires March impressions of at least 500, average position above 0 and at most 20, and CTR below 0.5%. It selected 39,545 items across 31 client groups. Within this selected pool, 55.2% met the proxy. Results below describe this selected pool only; they do not represent every page in the warehouse.</p>
+      <div class="callout"><strong>Cohort timing.</strong> Requiring at least 20 GSC-available days in April defines which pairs enter the evaluated cohort. April is not a model feature, so this is not label leakage through model input; however, exact cohort membership could not have been known at a March-time decision point. This retrospective analysis is not a live March queue or an early-warning test.</div>
+      <div class="callout"><strong>Outcome definition.</strong> An item meets the proxy when April impressions are no more than 80% of March impressions. It describes a retrospective month-over-month decline threshold. It does not label refresh success.</div>
     </section>
 
-    <section aria-labelledby="method">
-      <h2 id="method">Method</h2>
-      <p>The comparison rule adds three hand-weighted scores: search visibility (log-scaled 90-day impressions), time since the page was last updated, and average search position. It gives more position points to pages ranking 4–20 than to pages already in the top three, and a small default score when position is unavailable or outside that range. These weights are a simple comparison rule, not weights learned from data.</p>
-      <p>The trained Random Forest combines 100 decision trees; each tree makes a series of yes/no splits, and the combined trees produce a score for the decline label. We used 18 numeric inputs (including search demand, impressions, clicks, sessions, content age, click-through rate (CTR), and engagement) and five descriptive categories (competition level, content type, intent, age group, and position group). The categories were converted into 52 numeric input columns. The model did not receive the decline-label fields.</p>
-      <p>For a fair client-level separation, we used one random split: 25 clients (23,837 records) for training and seven different clients (6,163 records) for testing. No test client contributed training records. This is one held-out test set, not repeated cross-validation. Seed 42 makes the split reproducible.</p>
+    <section id="methods"><h2>3. Methodology</h2>
+      <h3>Features and baseline</h3>
+      <p>The learned model is L2-regularized Logistic Regression. Its five inputs are March log impressions, March log clicks, CTR, average position, and count of GSC-available days. Client and content IDs serve only for joins and client grouping; they are not predictors. April measurements and label-derived fields are excluded from features.</p>
+      <p>The transparent ML-07 baseline orders candidates by <code>log1p(March impressions)</code>, using March clicks and average position as tie-breakers. Both approaches use the same candidate pool and April proxy.</p>
+      <h3>Grouped evaluation and score comparability</h3>
+      <p>W07 uses five-fold GroupKFold by client. For each fold, the model is fit on the other client groups and evaluated on held-out clients. Imputation, standardization, and Logistic Regression are refit within each fold. Since these are separate fitted models, their raw score scales are not assumed to be comparable across folds. We therefore report rankings and metrics within each held-out fold, and do not treat the pooled out-of-fold scores as one global top-K ranking.</p>
+      <p>W06 provides a separate single client-held-out comparison. Its values are presented separately and are not mixed with W07.</p>
+      <div class="equation">ML-07 gate: impressionsₘₐᵣ ≥ 500; 0 &lt; positionₘₐᵣ ≤ 20; CTRₘₐᵣ &lt; 0.5%<br>Target proxy: impressionsₐₚᵣ ≤ 0.80 × impressionsₘₐᵣ</div>
     </section>
 
-    <section aria-labelledby="results">
-      <h2 id="results">Results on the same holdout</h2>
-      <p>Among the 6,163 test records, <strong>51.1%</strong> had the historical decline label. The two “share” columns show what fraction of the top 20 or top 50 records in each ranking carried that label. The overall ranking score summarizes how often a decline-labelled record is ranked above a non-decline record across ranking cutoffs; 0.5 is chance-level ordering.</p>
-      <div style="overflow-x:auto">
-        <table class="metrics">
-          <thead><tr><th scope="col">Scoring approach</th><th scope="col">Share with decline label (top 20)</th><th scope="col">Share with decline label (top 50)</th><th scope="col">Overall ranking score (ROC-AUC)</th></tr></thead>
+    <section id="results"><h2>4. Results against the baseline</h2>
+      <div class="callout"><strong>Main finding.</strong> On this ML-07-eligible pool, L2 Logistic Regression materially outperformed the specified ML-07 handwritten rule in the five client-grouped folds. Fold-macro P@50 was 0.804 vs. 0.420, a 0.384 absolute difference (about 1.9× the rule’s precision), and model P@50 was higher in each fold. Fold-macro ROC-AUC was 0.636 vs. 0.438 and average precision was 0.655 vs. 0.501. These are fold-local results on one rule-selected retrospective cohort, not evidence that machine learning universally beats handwritten rules.</div>
+      <h3>W07 · fold-local grouped out-of-fold results</h3>
+      <p>Within each held-out fold, model Precision@50 exceeded the rule’s value. The fold-level metrics show variation in prevalence and scale, so the macro means summarize five partitions descriptively; they are not confidence intervals.</p>
+      <figure>
+        <img src="assets/fold_precision_at_50.png" width="1280" height="720" alt="Paired bars compare model and ML-07 rule Precision at 50 within each of five held-out client-group folds. The model is higher in every fold; fold 4 is closest, at 0.60 versus 0.50. Two folds hold out one client each, and folds differ in size.">
+        <figcaption><strong>Figure 1.</strong> The model’s fold-local P@50 is higher in all five partitions (0.60–0.92) than the rule’s (0.18–0.60). Fold sizes and client counts vary, and this chart does not pool model scores across folds.</figcaption>
+      </figure>
+      <div class="table-scroll" role="region" aria-label="W07 fold-level metrics table" tabindex="0">
+        <table>
+          <caption>W07 metrics calculated within each validation fold; P@50, ROC-AUC, and average precision are shown for both rankings.</caption>
+          <thead><tr><th scope="col">Fold</th><th scope="col">Held-out clients</th><th scope="col">Items</th><th scope="col">Base rate</th><th scope="col">Model P@10</th><th scope="col">Rule P@10</th><th scope="col">Model P@20</th><th scope="col">Rule P@20</th><th scope="col">Model P@50</th><th scope="col">Rule P@50</th><th scope="col">Model AUC</th><th scope="col">Rule AUC</th><th scope="col">Model AP</th><th scope="col">Rule AP</th></tr></thead>
           <tbody>
-            <tr><th scope="row">Hand-written rule</th><td>20.0%</td><td>34.0%</td><td>0.529</td></tr>
-            <tr><th scope="row">Trained model</th><td>45.0%</td><td>58.0%</td><td>0.609</td></tr>
+            <tr><th scope="row">1</th><td>1</td><td>11,069</td><td>0.484</td><td>0.800</td><td>0.200</td><td>0.800</td><td>0.200</td><td>0.860</td><td>0.180</td><td>0.603</td><td>0.448</td><td>0.583</td><td>0.438</td></tr>
+            <tr><th scope="row">2</th><td>1</td><td>9,435</td><td>0.733</td><td>0.800</td><td>0.600</td><td>0.850</td><td>0.550</td><td>0.920</td><td>0.520</td><td>0.652</td><td>0.447</td><td>0.819</td><td>0.695</td></tr>
+            <tr><th scope="row">3</th><td>6</td><td>6,384</td><td>0.420</td><td>0.800</td><td>0.300</td><td>0.800</td><td>0.350</td><td>0.720</td><td>0.300</td><td>0.632</td><td>0.444</td><td>0.544</td><td>0.375</td></tr>
+            <tr><th scope="row">4</th><td>7</td><td>6,347</td><td>0.547</td><td>0.500</td><td>0.600</td><td>0.550</td><td>0.500</td><td>0.600</td><td>0.500</td><td>0.606</td><td>0.490</td><td>0.622</td><td>0.536</td></tr>
+            <tr><th scope="row">5</th><td>16</td><td>6,310</td><td>0.543</td><td>1.000</td><td>0.800</td><td>1.000</td><td>0.700</td><td>0.920</td><td>0.600</td><td>0.687</td><td>0.359</td><td>0.706</td><td>0.464</td></tr>
           </tbody>
         </table>
       </div>
-      <p>In this test set, 58% of the model's top 50 records had the decline label (29 records); the rule's top 50 contained 34% (17 records). That is a 24 percentage-point difference on this one split. The model's top-50 result was 6.9 points above the 51.1% test-set share, while its top 20 contained only 45% labelled declines—below that share. ROC-AUC is a summary of how often a randomly selected decline-labelled record is ranked above a non-decline record; 0.609 indicates only modest separation here. These figures describe this test sample and do not establish future performance.</p>
+      <p class="note">Across-fold macro means, computed from unrounded fold metrics: P@10 0.780 vs 0.500; P@20 0.800 vs 0.460; P@50 0.804 vs 0.420; ROC-AUC 0.636 vs 0.438; average precision 0.655 vs 0.501 (model vs rule). Individual fold values in the table are rounded to three decimals, so averaging the displayed values may differ in the final decimal place. The folds are uneven: the first two each hold one client, while the fifth holds 16. These five partitions do not support a calibrated uncertainty interval or a claim of stable performance on a future cohort.</p>
+      <p class="note">The existing W07 receipt also reports metrics after pooling all fold scores. Those values are not used here as the headline because they combine scores from separately fitted models and could compare items across non-comparable score scales. The fold-local table is the reported comparison.</p>
+
+      <h3>W06 · separate single client-held-out diagnostic</h3>
+      <p>On W06’s one held-out split (19,084 candidates; base rate 0.554), model P@10/P@20/P@50 was 0.80/0.75/0.72 versus 0.40/0.30/0.32 for the rule. ROC-AUC was 0.448 for both; average precision was 0.536 for both. This is a split-specific top-of-queue result, not a broad ranking improvement, and it is separate from W07.</p>
+
+      <h3>W07 · review archetypes</h3>
       <figure>
-        <img src="capstone_precision_comparison.png" alt="Bar chart showing 17 of the heuristic's top 50 records and 29 of the trained model's top 50 records carried the historical decline label.">
-        <figcaption>Figure 1. Share of labelled declines among the top 50 records for each scoring approach, using the same held-out clients.</figcaption>
+        <img src="assets/review_archetypes.png" width="1280" height="720" alt="Horizontal bars show 29,932 page-one low-CTR candidates, 8,412 striking-distance low-CTR candidates, and 1,201 partial-observation candidates among the 39,545 eligible items.">
+        <figcaption><strong>Figure 2.</strong> Most eligible items fall into the page-one low-CTR review archetype (29,932), followed by striking-distance low-CTR (8,412) and partial observation (1,201). These are rule-defined review groups, not learned quality classes or evidence that a refresh is needed.</figcaption>
       </figure>
     </section>
 
-    <section aria-labelledby="interpretation">
-      <h2 id="interpretation">Which information mattered most to the fitted model?</h2>
-      <p>The model's largest input-importance scores were: number of days with impressions in the trailing 90 days (0.1582), log-scaled 90-day impressions (0.1160), average search position (0.1109), and page age (0.0916). These scores describe how useful each input was for the fitted trees' splits; they do not show that a factor caused a decline. Related inputs can overlap, and this importance measure can favor some kinds of features.</p>
-      <figure>
-        <img src="capstone_feature_importance.png" alt="Horizontal bar chart of the eight inputs most used by the trained model to separate records with and without the historical decline label.">
-        <figcaption>Figure 2. Relative input-importance scores for the fitted model. Higher scores indicate more use in the tree splits, not greater causal influence.</figcaption>
-      </figure>
-    </section>
-
-    <section aria-labelledby="recommendation">
-      <h2 id="recommendation">Practical use and limits</h2>
-      <p>The score could be used to order pages for editorial inspection, but it should not trigger automatic changes. Check each page and its context before deciding whether to update it; track results if changes are made. The exploratory queue assigned these rule-based review categories: refresh 10,877; review the search snippet/click-through rate 9,428; monitor 6,428; review engagement 3,204; expand and refresh 63. These are category counts across the dataset, not measured benefits or success rates.</p>
+    <section id="limits"><h2>5. Limitations and honest framing</h2>
       <ul>
-        <li>The label identifies a drop already observed between two adjacent 30-day periods. The 90-day input metrics overlap those periods, so this analysis cannot establish advance warning.</li>
-        <li>Only one split of clients was tested. Results could differ for other clients or another split.</li>
-        <li>The overall ranking score was modest; missing numeric inputs were filled with zero, which can affect results.</li>
-        <li>Search-results features, seasonal patterns, and external changes are not included and could help explain the observed drops.</li>
-        <li>The exploratory full-dataset queue was scored by a model trained on 25 clients. Records from those training clients were seen during fitting, so their queue scores are not independent test predictions.</li>
-        <li>This study did not measure whether editing a page recovers its traffic. That would require a separate prospective experiment.</li>
+        <li>The target is an observed April impression decline proxy following March features. This single retrospective cohort does not establish early-warning ability or forecast performance across future months.</li>
+        <li>The paired cohort requires at least 20 GSC-available days in both March and April. April availability is not a feature, but using it to define cohort membership means this exact cohort could not have been selected at a March-time decision point. This is a cohort-selection and decision-time limitation, not label leakage. The evaluation is not a live March queue or early-warning test.</li>
+        <li>The analysis is conditional on the ML-07 gate and minimum GSC coverage; conclusions do not extend to excluded pages.</li>
+        <li>Fold sizes and held-out client counts are uneven. Two folds contain one held-out client each, and five folds are too few to characterize client-to-client uncertainty precisely.</li>
+        <li>Within-fold rankings avoid cross-model score comparison, but the macro fold mean remains descriptive and is not a statistical confidence interval.</li>
+        <li>The score is not calibrated confidence or expected refresh lift. No experiment or causal design tests what happens after an edit.</li>
+        <li>The feature set has no page age or refresh timestamp, current page text, query intent, conversion value, business priority, or intervention history. It cannot identify stale pages or assert that a particular page needs an edit.</li>
       </ul>
-      <div class="callout"><strong>What this study can say:</strong> On one held-out set of clients, the trained model placed more records carrying an already-observed decline label in its top 50 than the hand-written rule did. It cannot say whether it would identify future declines early or whether changing a page would restore traffic.</div>
+      <p>Accordingly, use terms such as <em>observed</em>, <em>measured</em>, and <em>directional</em>. The ranking is decision support for a human review queue; it does not prove, cause, guarantee, or predict Google’s algorithm.</p>
     </section>
 
-    <section aria-labelledby="repro">
-      <h2 id="repro">Reproducibility</h2>
-      <p>Verified with Python 3.11.9, NumPy 2.4.6, pandas 3.0.6, scikit-learn 1.9.1, and Matplotlib 3.10.8. The group split and trained tree-ensemble model use seed 42.</p>
-      <pre><code>python -m pip install -r requirements.txt jupyter
-jupyter notebook work/notebooks/capstone.ipynb</code></pre>
-      <p>From the repository root, open the notebook and choose <strong>Run All</strong>. The notebook uses <code>data/raw/content_refresh_anonymized.csv</code> and writes aggregate figures into <code>work/outputs/</code>.</p>
-      <p><a href="https://github.com/Divyam-Chauhan/FL_Machine_learning/blob/main/work/notebooks/capstone.ipynb">View the capstone notebook and full analysis</a>. The companion eight-section report is <code>work/capstone_report.md</code>.</p>
+    <section id="recommendations"><h2>6. Ranked recommendations from W07</h2>
+      <ol class="ranked">
+        <li><strong>Verify coverage before editing (1,201 candidates).</strong> Check that the page still exists and that both the page and GSC observations are current. Do not treat partial observation as a content problem.</li>
+        <li><strong>Review snippet and search intent (29,932 candidates).</strong> For page-one low-CTR items, inspect query mix, search-result features, title/snippet fit, and factual accuracy before considering a change.</li>
+        <li><strong>Review query-page fit and internal links (8,412 candidates).</strong> For striking-distance items, check intent alignment and internal discovery context. Use current page context to accept, revise, or reject the suggestion.</li>
+      </ol>
+      <p>These action counts describe W07’s rule-based archetypes. They are not refresh outcomes. Do not automatically publish, delete, redirect, canonicalize, merge, or noindex a page from a score.</p>
     </section>
-  </main>
-  <footer>Capstone research · Anonymized starter data · Aggregate publication only</footer>
+
+    <section id="repro"><h2>7. Reproducibility</h2>
+      <p>The executed <a href="https://github.com/Divyam-Chauhan/FL_Machine_learning/blob/main/work/notebooks/capstone.ipynb">ML-11 capstone notebook</a> and <a href="https://github.com/Divyam-Chauhan/FL_Machine_learning/blob/main/work/capstone_report.md">aggregate capstone report</a> reconstruct the paired population, candidate gate, fold-local metrics, and safe aggregate figures. The source analyses are in the <a href="https://github.com/Divyam-Chauhan/FL_Machine_learning/tree/main/work/notebooks">W03–W07 notebooks</a> and the <a href="https://github.com/Divyam-Chauhan/FL_Machine_learning">project repository</a>.</p>
+      <p>Execution uses Python 3.11.9, NumPy 2.4.6, pandas 3.0.6, scikit-learn 1.9.1, and DuckDB 1.5.6. The model random seed is 42. Re-running requires approved access to the gated warehouse and a local ignored <code>.env</code> containing the Hugging Face token; the token is not included in the repository or paper. From the repository root, open the notebook in Jupyter and run all cells with the Python 3.11 kernel.</p>
+      <p class="note">The action-queue CSV contains pseudonymous join keys and is for controlled internal use only. It is not linked or reproduced here. This page shows aggregate counts and fold metrics only.</p>
+    </section>
+
+    <section id="credit"><h2>8. Acknowledgments and data credit</h2>
+      <p><a href="https://flyrank.ai/">Built on the FlyRank ML Internship dataset,</a> with thanks to FlyRank for the internship program and access to the gated warehouse. The assigned <a href="https://github.com/Divyam-Chauhan/FL_Machine_learning/blob/main/docs/flyrank-seo-research-march-2026.pdf">March 2026 FlyRank SEO research paper</a> is background context only; its portfolio findings are not results of this model.</p>
+      <p>Page structure and visual communication were informed by research on <a href="https://idl.uw.edu/papers/comm-interactive-articles">communicating with interactive articles</a>. Image descriptions follow the <a href="https://www.w3.org/WAI/tutorials/images/">W3C guidance for informative images</a>; responsive layout and text alternatives are designed with <a href="https://www.w3.org/TR/WCAG22/">WCAG 2.2</a> in mind. These references inform presentation, not the ML findings.</p>
+    </section>
+  </article></main>
+</div>
+<footer><div>FlyRank Machine Learning Internship · ML-11 · Aggregate research page · <a href="https://flyrank.ai/">flyrank.ai</a></div></footer>
 </body>
 </html>

@@ -1,65 +1,73 @@
-# Prioritizing Content Refresh Reviews with Search and Engagement Signals
+﻿# ML-11 Capstone — Refresh / Content Opportunity Scoring
 
-- **Author:** Capstone project
-- **Lane:** Applied search intelligence / content refresh prioritization
-- **Date:** 2026-10-16
+- **Author:** Divyam Chauhan
+- **Lane:** Lane 2 — Refresh / Content Opportunity Scoring
+- **Source:** Gated Hugging Face `FlyRank/internship-warehouse`, release/build `v20260703`, table `fact_content_daily_performance`
+- **Feature window / outcome window:** March / April 2026
+- **Execution:** Python 3.11.9, seed 42
+
+> This is a retrospective ranking of an observed impression-decline proxy among ML-07-eligible items. It supports human review only; it does not establish early-warning ability, causal impact, or traffic recovery from a refresh. The evaluated cohort is not a live March queue or an early-warning test.
 
 ## 1. Problem framing
 
-This project compares a trained model with a hand-written scoring rule to see how they rank records carrying a historical search-impression decline label. The model is a Random Forest: it combines many decision trees, each of which applies a sequence of yes/no splits to the input information. The score could help an editor decide which pages to inspect first, but does not decide whether to make a change. A high-ranked record without the decline label may use review time unnecessarily; a decline-labelled record ranked lower may not be reviewed.
+The decision is which eligible page-client items an editor should inspect first. The analysis unit is one page-client pair after monthly aggregation. It compares a March-only machine-learning ranking with a transparent March-impressions rule. A reviewer must inspect the current page, query context, data coverage, and business value before deciding whether to change anything.
 
-## 2. Data safety
+## 2. Data safety and contract
 
-The analysis uses the repository's 30,000-row anonymized starter snapshot, with 32 pseudonymized client groups. It filters to records with positive 90-day impressions and content age of at least 90 days. The binary label is `trend_direction == "down"`: impressions in the latest 30-day period are more than 20% below the preceding 30-day period. This records an already-observed change, not a future outcome. `trend_direction` and `trend_pct` are not model inputs. `client_id` is used only for the group split; `content_id` is not a feature. However, the 90-day input metrics overlap the 30-day windows used to form the label. The evaluation therefore measures retrospective ranking alignment on held-out clients, not advance warning. No URLs, titles, raw queries, client names, or row-level recommendations are included in the published paper.
+The `fact_content_daily_performance` daily fact table from release/build `v20260703` is aggregated to one page-client pair per month. Eligibility for the paired frame requires at least 20 days with `gsc_data_available IS TRUE` in both March and April 2026 and positive March impressions. April availability is not a model feature, but using it to define cohort membership means this exact cohort could not have been selected at a March-time decision point. This cohort-selection/decision-time limitation is not label leakage. The resulting frame has 95,633 pairs; 47,323 (49.5%) meet the April decline proxy before candidate selection.
+
+The outcome is April impressions at most 80% of March impressions. It is a retrospective next-month proxy, not a refresh-success label. The ML-07 gate requires March impressions >=500, average position >0 and <=20, and CTR <0.5%. The gate selects 39,545 candidates across 31 client groups; the proxy rate in this pool is 55.2%. Results are conditional on this selected pool.
+
+Client/content IDs are used only for joins and grouping, never as features. April values and label-derived fields are not predictors. The notebook displays aggregate results only and does not preview or export the row-level queue. The available features contain no page age or refresh timestamp, so this work cannot identify stale pages.
 
 ## 3. Baseline
 
-The transparent hand-written scoring rule uses three quantities: 90-day search impressions (as a visibility measure), days since last update (as a freshness measure), and average search position (as a visibility/opportunity measure):
+The ML-07 rule ranks eligible candidates by `log1p(March impressions)`, with March clicks and average position as tie-breakers. This is a transparent comparison on the same eligible population and outcome used for the model.
 
-`100 × (0.40 × visibility + 0.30 × freshness + 0.25 × position opportunity)`
+## 4. Model and evaluation
 
-Visibility is `log1p(impressions_90d) / log1p(30000)`. Freshness is `days_since_last_update / 180`, clipped to `[0, 1]`. Position opportunity is 1.0 for positions 4–20, 0.5 for positions 1–3, and 0.1 for other or unavailable positions. The position bands are mutually exclusive; the notebook previously tested the broad 1–20 band before the nested 1–3 band, making the latter unreachable. That logic is corrected in the reported results.
+The model is L2-regularized Logistic Regression with median imputation and standard scaling fit within each training fold. Its five March-only inputs are log impressions, log clicks, CTR, average position, and GSC-available days. Client and content IDs are grouping/join keys only.
 
-## 4. Model / analysis
+W07 uses five-fold GroupKFold by client. Each validation fold is scored by a model trained on the other client groups. Since every fold fits a separate imputer, scaler, and logistic model, pooled raw scores are not assumed comparable across folds. The reported W07 comparisons are therefore calculated within each held-out fold. Two folds hold out one client each; the folds vary substantially in clients and item counts.
 
-The target is an already-observed decline indicator, not a future outcome: `is_declining_label = (trend_direction == "down")`. The analysis compares the rule with a Random Forest that combines 100 decision trees (`max_depth=10`, `random_state=42`). Inputs are 18 numeric signals (`search_volume`, `competition`, `cpc`, `word_count`, `char_count`, log-transformed 90-day impressions/clicks/sessions/AI sessions, days with impressions/sessions, content age, days since update, CTR, average position, engagement rate, scroll rate, and AI traffic percentage) and five categorical fields (`competition_level`, `content_type`, `main_intent`, `age_tier`, `position_tier`). The five categories are converted into numeric indicator columns, producing 52 input columns for this run.
+W06 is a separate single client-held-out diagnostic. Its metrics are reported separately and not blended with W07.
 
-## 5. Evaluation
+## 5. Results
 
-`GroupShuffleSplit(test_size=0.20, random_state=42)` holds out complete client groups: 25 training clients (23,837 rows) and 7 unseen test clients (6,163 rows). In the test group, 51.1% of records carried the decline label. The comparison below uses the same test rows and top-20/top-50 cutoffs for both methods. The top-20 and top-50 shares are the fractions of those records carrying the label. ROC-AUC summarizes how often a decline-labelled record is ranked above a non-decline record across cutoffs; 0.5 is chance-level ordering.
+The candidate-pool proxy rate is 0.552. The table reports within-fold W07 results; P@50, ROC-AUC, and average precision are shown for both rankings.
 
-| Scoring approach | Share with label (top 20) | Share with label (top 50) | Overall ranking score (ROC-AUC) |
-|---|---:|---:|---:|
-| Hand-written rule | 20.0% | 34.0% | 0.529 |
-| Trained model | 45.0% | 58.0% | 0.609 |
+| Fold | Held-out clients | Items | Base rate | Model P@50 | Rule P@50 | Model AUC | Rule AUC | Model AP | Rule AP |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 1 | 11,069 | 0.484 | 0.860 | 0.180 | 0.603 | 0.448 | 0.583 | 0.438 |
+| 2 | 1 | 9,435 | 0.733 | 0.920 | 0.520 | 0.652 | 0.447 | 0.819 | 0.695 |
+| 3 | 6 | 6,384 | 0.420 | 0.720 | 0.300 | 0.632 | 0.444 | 0.544 | 0.375 |
+| 4 | 7 | 6,347 | 0.547 | 0.600 | 0.500 | 0.606 | 0.490 | 0.622 | 0.536 |
+| 5 | 16 | 6,310 | 0.543 | 0.920 | 0.600 | 0.687 | 0.359 | 0.706 | 0.464 |
 
-In this test set, 29 of the model's top 50 records had the decline label, compared with 17 of the rule's top 50. That is a 24-percentage-point difference in the share for this one test split. The model's top-50 share is 6.9 percentage points above the 51.1% test-set share; its top-20 share (45.0%) is below that level. The overall ranking score of 0.609 indicates only modest separation here. These are retrospective results from one client holdout, not evidence of advance warning or a guarantee of performance on new samples.
+Across-fold macro means, computed from unrounded fold metrics, were: P@10 0.780 vs 0.500; P@20 0.800 vs 0.460; P@50 0.804 vs 0.420; ROC-AUC 0.636 vs 0.438; and average precision 0.655 vs 0.501 (model vs rule). The fold table rounds each value to three decimals, so recomputing means from its displayed values may differ in the last decimal. These descriptive means are not confidence intervals. W07's existing pooled receipt is numerically reproducible, but its ranking metrics compare scores from separately fitted models; pooled metrics are not used as the headline.
 
-These are capstone-notebook results, not a rerun of the reference pipeline benchmark in `outputs/model_report.md`. The reference pipeline uses a different client split, baseline, feature encoding, and Random Forest configuration (200 trees and `min_samples_leaf=25`, versus 100 trees and no class weighting here); its reported 0.680/0.240 Precision@50 values must not be mixed into this table.
+W06, separately: on 19,084 held-out candidates with a 0.554 base rate, model P@10/P@20/P@50 was 0.80/0.75/0.72 versus 0.40/0.30/0.32 for the rule. ROC-AUC was 0.448 for both and average precision was 0.536 for both. This is a split-specific top-of-queue result, not a broad ranking improvement.
 
 ## 6. Interpretation
 
-The largest tree-split importance scores were days with impressions (0.1582), log 90-day impressions (0.1160), average position (0.1109), and content age (0.0916), followed by word count (0.0643), character count (0.0521), CTR (0.0388), and scroll rate (0.0364). These scores describe how the fitted trees used the inputs to separate the labels; they are not causal effects, and related inputs can share or distort importance.
+Within the selected pool, the model ranked proxy-positive items higher than the rule within each W07 fold at P@50. The fold rates and sizes vary, and the evaluation covers only one adjacent-month cohort. The score is not calibrated confidence or expected refresh lift. No causal, early-warning, or future-cohort claim follows from these results.
 
-The two figures embedded in the deployed page show the corrected same-holdout Precision@50 comparison and these top eight relative importances.
+## 7. Ranked recommendations
 
-## 7. Recommendation
+W07's rule-based archetypes suggest a human review order:
 
-Use the ranked list only as a decision-support queue. Editors should verify the underlying page and context before acting, then record what was changed and monitor outcomes. The full-data action summary from this run was: refresh 10,877; CTR review 9,428; monitor 6,428; engagement review 3,204; expand and refresh 63. These are rule-generated aggregate counts, not validated outcomes. The model was fitted on the training-client subset before producing the exploratory full-portfolio queue; those queue scores are not all out-of-sample. Do not publish row-level queue exports or pseudonymous IDs.
+1. **Verify coverage before editing:** 1,201 partial-observation candidates; confirm page existence and measurement coverage.
+2. **Review snippet and search intent:** 29,932 page-one low-CTR candidates; inspect query mix, result features, snippet fit, and factual accuracy.
+3. **Review query-page fit and internal links:** 8,412 striking-distance low-CTR candidates; check intent alignment and internal discovery context.
+
+These counts describe routing rules, not validated actions or outcomes. Do not publish, delete, redirect, canonicalize, merge, or noindex a page from a score alone.
 
 ## 8. Reproducibility
 
-Verified with Python 3.11.9, NumPy 2.4.6, pandas 3.0.6, scikit-learn 1.9.1, and Matplotlib 3.10.8. The random seed is 42 for both the group split and forest.
+Run `work/notebooks/capstone.ipynb` from the repository root using Python 3.11.9 and a Python 3.11 Jupyter kernel. The notebook reads March/April partitions directly from the gated warehouse; the Hugging Face token is read from the ignored `.env` and never printed. Seed: 42. Verified package versions: NumPy 2.4.6, pandas 3.0.6, scikit-learn 1.9.1, DuckDB 1.5.6.
 
-From a fresh clone, install the project requirements and Jupyter, open the notebook, and use **Run All**:
+Aggregate figures are saved under `work/figures/`. Generated queue CSVs remain ignored by Git and are not linked or included here.
 
-```bash
-python -m pip install -r requirements.txt jupyter
-jupyter notebook work/notebooks/capstone.ipynb
-```
+## 9. Acknowledgments and data credit
 
-Run from the repository root or the notebook directory. The input dataset is the bundled `data/raw/content_refresh_anonymized.csv`; generated capstone figures belong in `work/outputs/`. The deployed page uses copies of the aggregate figures in `docs/`.
-
----
-
-**Claim boundary:** This is an observational ranking exercise on an anonymized starter snapshot. It measures alignment with a historical decline label; it does not predict Google's ranking algorithm, establish why traffic changed, or estimate the causal impact of refreshing content.
+Thanks to [FlyRank](https://flyrank.ai/) for the internship program and warehouse access. The assigned [March 2026 FlyRank SEO research paper](../docs/flyrank-seo-research-march-2026.pdf) is background context only; its portfolio results are not findings from this model.
