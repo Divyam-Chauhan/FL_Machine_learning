@@ -1,116 +1,85 @@
-# FlyRank ML Internship — Starter Repo
+# Search Intelligence Capstone: Content Opportunity Scoring
 
-**Applied Search Intelligence: Google Search Ranking & Discoverability**
+**I built a retrospective ranking workflow to help editorial teams decide which eligible search-content items to inspect first.** This is my Lane 2 project for the FlyRank Machine Learning Internship, using its gated search warehouse and a client-grouped evaluation.
 
-This is the starting point for the FlyRank ML Internship. You **clone it into your own public
-repo** (one click — *Use this template*), build everything there, and submit that repo URL on
-each assignment in your portal — it's your workspace, your submission, and your portfolio all
-at once. The rhythm is simple: do the work, commit it, submit on the card. Done.
+> **Headline result:** Within this selected March/April cohort, the L2 Logistic Regression ranked April impression-decline proxy cases ahead of the specified ML-07 rule in all five client-grouped folds. Fold-macro Precision@50 was **0.804 vs. 0.420** (a 0.384 absolute difference); macro ROC-AUC was **0.636 vs. 0.438**, and average precision was **0.655 vs. 0.501**. These are descriptive fold-local results against this particular baseline, not proof that machine learning universally beats rules.
 
-Everything here runs on a small **anonymized** slice of real FlyRank search data. No credentials,
-no private client data, no setup headaches.
+**Read the [deployed research paper](https://divyam-chauhan.github.io/FL_Machine_learning/)** · [Explore the capstone notebook](work/notebooks/capstone.ipynb) · [Read the aggregate report](work/capstone_report.md) · [Connect on LinkedIn](https://www.linkedin.com/in/divyamchauhan2/)
 
-> **New here?** Two reads: **[SETUP.md](SETUP.md)** (GitHub, Colab, and data access — ten
-> minutes, with every silent pitfall flagged), then **[GUIDE.md](GUIDE.md)** (every file
-> explained, what to edit vs. leave alone, and where your own work goes — five minutes).
+## The decision I studied
 
----
+FlyRank’s Lane 2 asks how search signals can help prioritize content for review. I focused on high-impression, low-CTR page-client items: which ones should a person inspect first for snippet fit, query-page fit, measurement coverage, or internal discovery?
 
-## Quickstart — first win in 2 minutes
+The ranking is **decision support for human review**. It does not diagnose stale pages, determine that a page needs a refresh, or estimate what an edit will do to traffic.
 
-The fastest path is Google Colab (one click, zero install). Open Notebook 1 and run all cells:
+## How I approached it
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/flyrank-bih/flyrank-ml-internship-starter/blob/main/notebooks/01_first_look_and_discovery.ipynb)
- **Week 1 — Run it, then discover a real truth yourself**
+1. **Frame the review decision.** Define the intended action as prioritizing eligible items for inspection, not automating edits.
+2. **Set the data contract.** Aggregate the daily warehouse table to one page-client pair per month; require at least 20 GSC-available days in both months and positive March impressions.
+3. **Define the comparison.** Select the ML-07 candidate pool and label an item positive when April impressions are at most 80% of March impressions.
+4. **Build a transparent baseline.** Rank candidates by `log1p(March impressions)`, with March clicks and average position as tie-breakers.
+5. **Train and validate.** Fit L2 Logistic Regression on March-only features and compare model and rule within five client-grouped held-out folds.
+6. **Turn results into review prompts.** Use the W07 action playbook to suggest what a human should inspect first; keep the queue itself out of this public repo view.
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/flyrank-bih/flyrank-ml-internship-starter/blob/main/notebooks/02_your_first_readable_model.ipynb)
- **Week 2 — The model is just a rule you can read**
+## Data and model
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/flyrank-bih/flyrank-ml-internship-starter/blob/main/notebooks/03_working_with_the_full_release.ipynb)
- **Weeks 3+ — The full release (~79M rows) via DuckDB, no download needed** — hosted at
- [`FlyRank/internship-warehouse`](https://huggingface.co/datasets/FlyRank/internship-warehouse) (gated: request access + accept the data-use terms, approval is instant)
+The source is the gated [FlyRank/internship-warehouse](https://huggingface.co/datasets/FlyRank/internship-warehouse), release/build **v20260703**, table `fact_content_daily_performance`. The analysis uses March 2026 features and April 2026 outcomes, aggregated to a page-client pair. The paired cohort contains **95,633** items after the coverage and positive-March-impression filters.
 
-### Prefer local?
+The ML-07 gate selects **39,545 candidates across 31 client groups** with at least 500 March impressions, average position above 0 and at most 20, and CTR below 0.5%. The measured outcome is the retrospective decline proxy: April impressions ≤ 80% of March impressions. It is not a refresh-success label.
 
-```bash
-git clone <this-repo-url>
-cd flyrank-ml-internship-starter
-pip install -r requirements.txt          # or: uv pip install -r requirements.txt
-python scripts/run_all.py
-```
+The model uses five March-only inputs: log impressions, log clicks, CTR, average position, and GSC-available days. Client and content IDs are used only for joins and client grouping, never as predictors. The W07 evaluation uses five-fold `GroupKFold` by client. Because each fold has its own fitted model, I report ranking and metrics within each held-out fold rather than treating scores from separate folds as one comparable pooled ranking.
 
-That runs the whole pipeline on the bundled sample and writes results to `outputs/`.
+**Decision-time limitation:** April GSC coverage is required to define the evaluated cohort. April is not a model feature, so this is not input leakage; however, exact cohort membership could not have been selected at a March-time decision point. This is one retrospective adjacent-month cohort, not a live March queue or an early-warning test. Two folds hold out one client each and fold sizes vary, so the macro metrics are descriptive rather than confidence intervals.
 
----
+## What the evaluation showed
 
-## What you get
+| Fold-macro metric | Logistic Regression | ML-07 rule |
+|---|---:|---:|
+| Precision@50 | **0.804** | 0.420 |
+| ROC-AUC | **0.636** | 0.438 |
+| Average precision | **0.655** | 0.501 |
 
-| Path | What it is |
-|---|---|
-| `notebooks/` | Week 1–2 **first-win notebooks** (Colab-ready). Start here. |
-| `scripts/01–05` + `run_all.py` | The runnable reference pipeline: prepare → baseline → train → evaluate → PDF. |
-| `data/raw/content_refresh_anonymized.csv` | The anonymized starter dataset (~30k pages). |
-| `outputs/` | Example outputs so you can see the **target shape** (`model_report.md`, `refresh_queue_sample.csv`, `charts/`). |
-| `work/` | **Your space.** Lane experiments and your capstone live here — see `work/README.md`. |
-| `docs/` | The core docs + the data dictionary (see below). |
+The model’s fold-local Precision@50 exceeded the rule’s in all five folds. This is a strong result against this specified rule on this selected retrospective cohort; it does not establish performance on future cohorts, causal refresh impact, or guaranteed traffic recovery. The score is not calibrated confidence or expected refresh lift.
 
-### Read these (in `docs/`)
+### Fold-local Precision@50
 
-1. **`ml-core-foundation-framework.md`** — the first-principles map of ML as a whole system. The backbone of the live sessions.
-2. **`ml-intern-dataset-and-lane-guide.md`** — how to use the data safely, the capstone workflow, and the analysis "lanes" you can pick from.
-3. **`intern-free-tooling-guide.md`** — the zero-budget tool stack (Python, Colab, free AI assistants). You never need to pay for anything.
-4. **`data-dictionary.md`** — all 44 columns: meaning, scale, and gotchas. Keep it open while you work.
+![Paired bars compare model and ML-07 rule Precision@50 within each of five held-out client-group folds; the model is higher in each fold. The folds vary in size, and two hold out one client each.](docs/assets/fold_precision_at_50.png)
 
----
+*Each bar is computed within its held-out fold. The chart shows the consistent direction across these five partitions; it does not pool scores across folds or quantify future-cohort uncertainty.*
 
-## The pipeline (what `run_all.py` does)
+### W07 review archetypes
 
-```text
-01_prepare_features.py   clean + build the feature vector, define the label
-02_baseline_score.py     a transparent hand-rule "fix this first" score
-03_train_model.py        logistic regression, decision tree, random forest (client-holdout split)
-04_evaluate_and_export.py  ranked queue + charts + Markdown report
-05_build_pdf_report.py   a shareable PDF summary
-```
+![Aggregate counts for three rule-defined review groups: 29,932 page-one low-CTR candidates, 8,412 striking-distance low-CTR candidates, and 1,201 partial-observation candidates.](docs/assets/review_archetypes.png)
 
-On the bundled sample, the learned model clearly beats the hand-written rule at picking the right
-pages to review first (**Precision@50 ≈ 0.24 → 0.74**; the model number can land 0.68–0.74
-depending on library versions — the ~3x lift is the point). The notebooks compute these numbers
-live, so they always reflect the current data and environment.
+*These are rule-defined review groups, not learned quality classes or evidence that a refresh is needed.*
 
-**Teaching point:** the model is the capstone, but the *workflow* is the lesson —
-`problem framing → data cleaning → baseline → first model → evaluation → explainable recommendation`.
+## Ranked human-review recommendations
 
----
+1. **Verify observation coverage before editing** for the **1,201** partial-observation candidates. Check that the page and GSC measurements are current; sparse observation is not itself a content problem.
+2. **Review snippet and search intent** for the **29,932** page-one, low-CTR candidates. Inspect the query mix, search-result context, title/snippet fit, and factual accuracy before considering a change.
+3. **Review query-page fit and internal links** for the **8,412** striking-distance, low-CTR candidates. Check intent alignment and internal discovery context before deciding whether an edit is appropriate.
 
-## Data safety (read `DATA_USE.md`)
+These counts describe W07’s aggregate action archetypes. They are prompts for a human reviewer, not validated refresh actions or predicted outcomes.
 
-- Only the small **anonymized** CSV ships here — no client names, domains, URLs, titles, or keywords.
-- **Never** add raw private client data to this repo or your fork. Need more data? Request an approved
-  release from your mentor — never export it yourself.
-- Don't paste client data into third-party AI tools.
-- Frame every result as **observed / measured / directional / decision-support** — never
-  "I predicted Google's algorithm."
+## Follow the project work
 
-The `.gitignore` blocks datasets by default, and CI fails any commit that includes a dataset.
+The notebooks show how I moved from the assignment question to a checked, evaluated, and actionable analysis:
 
----
+| Step | Notebook(s) | Purpose |
+|---|---|---|
+| Frame the question | [W01](work/notebooks/w01_research_question.ipynb), [W02](work/notebooks/w02_ml_task_framing.ipynb) | Choose the lane and define the decision to support. |
+| Define and check the data | [W03 contract](work/notebooks/w03_data_contract.ipynb), [W03 leakage check](work/notebooks/w03_feature_leakage_check.ipynb) | Establish the warehouse grain, cohort, and safe features. |
+| Audit signals and set a rule baseline | [W04 signal audit](work/notebooks/w04_signal_audit.ipynb), [W04 baseline](work/notebooks/w04_baseline_score.ipynb) | Assess candidate signals and specify the transparent comparison. |
+| Train and validate | [W05 model](work/notebooks/w05_model.ipynb), [W06 validation audit](work/notebooks/w06_validation_audit.ipynb) | Fit the model and examine held-out client performance. |
+| Build the action playbook | [W07 action playbook](work/notebooks/w07_action_playbook.ipynb) | Turn aggregate patterns into ranked review prompts. |
+| Reproduce the capstone | [Capstone notebook](work/notebooks/capstone.ipynb), [capstone report](work/capstone_report.md) | Reconstruct the paired cohort, fold-local results, and safe figures. |
 
-## Assignments & schedule
+### Reproducibility and data safety
 
-Weekly assignments, live events, and the capstone live on **your portal board** (your
-enrollment email has your access link). This repo is the shared technical foundation they all
-build on — and the `skills/` folder here is the instruction library for your AI assistant
-(start at [skills/README.md](skills/README.md)).
+The capstone notebook was executed with **Python 3.11.9** (seed 42). Re-running it requires approved access to the gated warehouse and a local Hugging Face token read from the ignored `.env`; credentials are not part of this repository. The row-level action queue contains pseudonymous join keys and is for controlled internal use, so it is not linked or reproduced here. Public figures and results are aggregate only.
 
-**First time with GitHub?** You need exactly four things (full walkthrough: [SETUP.md](SETUP.md)):
-1. A free account at github.com.
-2. Your own copy of this repo: **Use this template → Create a new repository** → public.
-   (One click — brings the notebooks, `work/`, and the CI leak-guard with it.)
-3. In Colab: *File → Save a copy in GitHub* → pick your copy, branch `main` (Colab handles auth).
-4. That's your submission repo — share its **github.com/you/your-repo** URL with Assignment 1
-   (never a colab.research.google.com or drive.google.com link).
+For internship setup and repository conventions, see [`SETUP.md`](SETUP.md), [`DATA_USE.md`](DATA_USE.md), and [`work/README.md`](work/README.md). The deployed paper contains the full methodology, fold table, limitations, and references.
 
----
+## Acknowledgments
 
-*Track leads: Mirza Ašćerić (ML) · Hole (data engineering). Code under MIT (see `LICENSE`); data under `DATA_USE.md`.*
+**[Built on the FlyRank ML Internship dataset](https://flyrank.ai/).** Thanks to FlyRank for the internship program and access to the gated warehouse. The assigned March 2026 FlyRank SEO research paper is background context; its portfolio findings are not results from my model.
